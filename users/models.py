@@ -6,6 +6,7 @@ class User(AbstractUser):
     username = None
 
     email = models.EmailField(unique=True, verbose_name='email')
+    basket = models.JSONField(default=dict, verbose_name='корзина')
 
     is_superuser = models.BooleanField(default=False, verbose_name='администратор')
     is_staff = models.BooleanField(default=False, verbose_name='сотрудник')
@@ -20,8 +21,3 @@ class User(AbstractUser):
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
-
-
-class Profile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name='пользователь')
-    basket = models.JSONField(default=dict, verbose_name='корзина')

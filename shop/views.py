@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from shop.models import Category, Subcategory, Product
 from shop.paginators import DefaultPaginator
 from shop.serializers import CategorySerializer, SubcategorySerializer, ProductSerializer, BasketSerializer
-from users.models import Profile
+from users.models import User
 
 
 # __Category Views__
@@ -113,23 +113,19 @@ class BasketAddAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        product_title = request.data.get('product_title')
+        product_id = str(request.data.get('product_id'))
         quantity = request.data.get('quantity')
+        user_id = self.request.user.id
+        user = User.objects.get(pk=user_id)
+        basket_items = user.basket
 
-        try:
-            profile = Profile.objects.get(user=request.user)
-        except ObjectDoesNotExist:
-            return Response({'error': 'Такого профиля нет'})
-
-        basket_items = profile.basket
-
-        if product_title in basket_items:
-            basket_items[product_title] += quantity
+        if product_id in basket_items.keys():
+            basket_items[product_id] += quantity
         else:
-            basket_items[product_title] = quantity
+            basket_items[product_id] = quantity
 
-        profile.basket = basket_items
-        profile.save()
+        user.basket = basket_items
+        user.save()
 
         return Response(status=status.HTTP_201_CREATED)
 
@@ -138,26 +134,23 @@ class BasketRemoveAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request):
-        try:
-            profile = Profile.objects.get(user=request.user)
-        except ObjectDoesNotExist:
-            return Response({'error': 'Такого профиля нет'})
-
         data = json.loads(request.body)
-        product_title_request = data.get('product_title')
+        product_id_request = data.get('product_id')
+        user_id = self.request.user.id
+        user = User.objects.get(pk=user_id)
 
-        if not product_title_request:
-            return Response({'error': 'Укажите имя продукта'},
+        if not product_id_request:
+            return Response({'error': 'Укажите id продукта'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        basket_items = profile.basket
+        basket_items = user.basket
 
-        for product_title, quantity in basket_items.items():
-            if product_title == product_title_request:
-                del basket_items[product_title]
-                profile.basket = basket_items
-                profile.save()
-                return Response({'message': 'Продукт удален из корзины'})
+        if str(product_id_request) in basket_items.keys():
+            del basket_items[str(product_id_request)]
+            user.basket = basket_items
+            user.save()
+
+            return Response({'message': 'Продукт удален из корзины'})
 
         return Response({'error': 'Продукт не найден в корзине'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -166,18 +159,14 @@ class BasketListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        try:
-            profile = Profile.objects.get(user=request.user)
-        except ObjectDoesNotExist:
-            return Response({'error': 'Такого профиля нет'})
 
-        basket_items = profile.basket
+        basket_items = self.request.user.basket
         products_in_basket = []
         total_price = 0
-        for product_title, quantity in basket_items.items():
-            product = Product.objects.get(title=product_title)
+        for product_id, quantity in basket_items.items():
+            product = Product.objects.get(id=product_id)
             products_in_basket.append({
-                'product_title': product_title,
+                'product_id': product_id,
                 'quantity': quantity,
             })
             if product.price:
